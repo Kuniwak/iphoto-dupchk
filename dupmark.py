@@ -32,8 +32,8 @@ for i in range(max):
         all_paths.add(path)
         dup_group_map[path] = str(i).zfill(max_digit)
 
-flaghelper = iphoto.FlagHelper(iphoto_path)
-flaghelper.add_all(paths)
+flaghelper = iphoto.FlaggingHelper(iphoto_path)
+flaghelper.flag_all(all_paths)
 
 renamer = lambda old_name, path: '#dupmark:{0}:{1}'.format(dup_group_map[path], old_name)
 rnhelper = iphoto.RenamingHelper(iphoto_path)

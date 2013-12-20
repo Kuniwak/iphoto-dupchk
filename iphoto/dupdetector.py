@@ -54,7 +54,10 @@ class Dupdetector:
         image_count = len(image_paths)
 
         pbar_options = {
-            'widgets': [progressbar.Counter(), ' / ' + str(image_count) + ' ', progressbar.Bar()],
+            'widgets': ['Checking: ',
+                        progressbar.Counter(),
+                        ' / {0} '.format(image_count),
+                        progressbar.Bar()],
             'maxval': image_count
         }
         pbar = progressbar.ProgressBar(**pbar_options).start()
@@ -80,8 +83,9 @@ class Dupdetector:
 
         return result
 
-    def check(self):
+    def export(self, filepath):
         self._build_hashdict()
 
-        for dupset in self._get_duplicateds():
-            print(json.dumps(list(dupset)))
+        with open(filepath, 'w') as f:
+            for dupset in self._get_duplicateds():
+                (json.dumps(list(dupset)))

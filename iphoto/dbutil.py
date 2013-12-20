@@ -21,7 +21,7 @@ class LibraryHelper():
                                         'Library.apdb')
 
         if not os.path.exists(self.lib_db_path):
-            raise Exception('Library.apdb not found')
+            raise Exception('Library.apdb not found: ' + self.lib_db_path)
 
         self.conn = None
 
@@ -39,36 +39,31 @@ class LibraryHelper():
 
 
 class FlaggingHelper(LibraryHelper):
-    """A helper class for hadling keywords."""
+    """A helper class for flagging."""
 
-    def add(self, path, keyword_id):
+    def flag(self, path):
         """
-        Adds a keyword to an image has the specified path.
+        Flags an image has the specified path.
 
-        :param path: Path for the image to add a keyword.
-        :param keyword_id: ID number of the keyword. You can see the ID by
-                           sqplite3.
+        :param path: Path for the image to flag.
         """
-        self.add_all((path,), keyword_id)
+        self.flag_all((path,))
 
-    def add_all(self, paths, keyword_id):
+    def flag_all(self, paths):
         """
-        Adds a keyword to all images has specified paths.
+        Flags all images has specified paths.
 
-        :param paths: Path for the image to add a keyword.
-        :param keyword_id: ID number of the keyword. You can see the ID by
-                           sqplite3.
+        :param paths: Path for the image to flag.
         """
         self.connect()
 
         def param_generator():
             """
-            A generator for SQL parameters for adding a keyword to images.
+            A generator for SQL parameters for flagging to images.
 
             :returns: A tuple of ``(RKVersion.modelId,)``.
             """
             cur = self.conn.cursor()
-            cur.execute('SELECT max(modelId) FROM RKFlaggingForVersion;')
 
             q = """
                 SELECT versionId
@@ -87,7 +82,7 @@ class FlaggingHelper(LibraryHelper):
 
         try:
             cur = self.conn.cursor()
-            self.preadd()
+            self.preflag()
 
             # Use 2 temporary tables, these make greater performance.
             # At first, we used INNER JOIN but it was very very slow.
@@ -124,7 +119,7 @@ class FlaggingHelper(LibraryHelper):
 
                 DROP TABLE TempDupmark_0;
                 """
-            cur.execute(q)
+            cur.executescript(q)
 
             # Unflag all
             cur.execute('UPDATE RKVersion SET isFlagged = 0;')
@@ -136,56 +131,54 @@ class FlaggingHelper(LibraryHelper):
 
             cur.execute('DROP TABLE TempDupmark_1;')
             self.conn.commit()
-            self.postadd()
+            self.postflag()
         finally:
             self.close()
 
-    def preadd(self):
+    def preflag(self):
         """
-        Handles before adding all keyword. Overriding this method is useful for
+        Handles before flagging. Overriding this method is useful for
         displaying the progress.
         """
         logging.info('Applying to iPhoto...')
 
     def update(self):
         """
-        Handles after each adding a keyword. Overriding this method is useful
-        for displaying the progress.
+        Handles after each flagging. Overriding this method is useful for
+        displaying the progress.
         """
         pass
 
-    def postadd(self):
+    def postflag(self):
         """
-        Handles after all keyword were added. Overriding this method is useful
-        for displaying the progress.
+        Handles after flagged all. Overriding this method is useful for
+        displaying the progress.
         """
         logging.info('Done.')
 
 
 class FlaggingHelperWithProgressbar(FlaggingHelper):
     def __init__(self, iphoto_path):
-        """A helper class for hadling keywords with a progress bar."""
+        """A helper class for flagging with a progress bar."""
         super(FlaggingHelperWithProgressbar, self).__init__(iphoto_path)
         self.pbar = None
 
-    def add_all(self, paths, keyword_id):
+    def flag_all(self, paths):
         """
-        Adds a keyword to all images has specified paths.
+        Flags to all images has specified paths.
 
-        :param paths: Path for the image to add a keyword.
-        :param keyword_id: ID number of the keyword. You can see the ID by
-                           sqplite3.
+        :param paths: Path for the image to flag.
         """
         self._image_paths = paths
-        super(FlaggingHelperWithProgressbar, self).add_all(paths, keyword_id)
+        super(FlaggingHelperWithProgressbar, self).flag_all(paths)
         self._image_paths = None
 
-    def preadd(self):
+    def preflag(self):
         """Prepares a progress bar."""
         logging.debug('Applying to iPhoto...')
         path_count = len(self._image_paths)
         pbar_options = {
-            'widgets': ['Adding keyword: ',
+            'widgets': ['Flagging: ',
                         progressbar.Counter(),
                         ' / {0} '.format(path_count),
                         progressbar.Bar()],
@@ -198,7 +191,7 @@ class FlaggingHelperWithProgressbar(FlaggingHelper):
         """Updates the progress bar."""
         self.pbar.update(self.pbar.currval + 1)
 
-    def postadd(self):
+    def postflag(self):
         """Finishs the progress bar."""
         logging.debug('Done.')
         self.pbar.finish()
@@ -236,7 +229,7 @@ class RenamingHelper(LibraryHelper):
 
                 res = cur.fetchone()
                 if res is not None:
-                    yield params.append((renamer(res[0], path), res[1]))
+                    yield (renamer(res[0], path), res[1])
                     self.update()
 
         try:
